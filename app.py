@@ -7,6 +7,8 @@ from agent import get_vector_store, process_user_input
 # Load environment variables
 load_dotenv()
 
+print("API KEY:", os.getenv("OPENAI_API_KEY"))
+
 # --- UI CONFIGURATION ---
 st.set_page_config(
     page_title="Insight Assistant", 
