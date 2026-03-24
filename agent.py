@@ -1,4 +1,6 @@
 import os
+import certifi
+os.environ['SSL_CERT_FILE'] = certifi.where()
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
