@@ -1,10 +1,12 @@
 import streamlit as st
+import certifi
 import os
 from dotenv import load_dotenv
 from utils import extract_text_from_pdf, extract_text_from_txt, get_text_chunks
 from agent import get_vector_store, process_user_input
 
 # Load environment variables
+os.environ['SSL_CERT_FILE'] = certifi.where()
 load_dotenv()
 
 print("API KEY:", os.getenv("OPENAI_API_KEY"))
