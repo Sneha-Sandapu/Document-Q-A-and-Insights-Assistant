@@ -16,7 +16,7 @@ st.set_page_config(
     layout="wide",
 )
 
-# Custom CSS for Centered Title and 3-Column Premium Look
+# Custom CSS for Premium Look and Spacing
 st.markdown("""
     <style>
     .stApp {
@@ -27,30 +27,48 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
         font-weight: 800;
         color: #1e3a8a;
-        font-size: 2.8rem;
-        padding-top: 1rem;
-        padding-bottom: 2rem;
+        font-size: 3rem;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+    .column-header {
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        color: #1e40af;
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
     }
     .section-box {
         background-color: rgba(255, 255, 255, 0.7);
         backdrop-filter: blur(10px);
-        border-radius: 15px;
-        padding: 20px;
+        border-radius: 20px;
+        padding: 30px;
         border: 1px solid rgba(255, 255, 255, 0.4);
-        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
-        min-height: 600px;
-    }
-    .stHeader {
-        color: #1e40af;
-        font-weight: 700;
-        margin-bottom: 1rem;
+        box-shadow: 0 10px 40px rgba(31, 38, 135, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        margin-bottom: 50px; /* White space below */
     }
     .stButton>button {
         width: 100%;
-        border-radius: 8px;
+        border-radius: 12px;
         background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
         color: white;
-        font-weight: 600;
+        font-weight: 700;
+        padding: 0.6rem;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: all 0.3s;
+    }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    /* Add some extra space around inputs */
+    .stTextInput, .stTextArea, .stFileUploader {
+        margin-bottom: 20px !important;
     }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
@@ -79,15 +97,15 @@ def main():
 
     # --- LEFT COLUMN: UPLOAD & SETTINGS ---
     with left_col:
+        st.markdown('<h2 class="column-header">⚙️ Upload & Settings</h2>', unsafe_allow_html=True)
         st.markdown('<div class="section-box">', unsafe_allow_html=True)
-        st.subheader("⚙️ Upload & Settings")
         
         input_mode = st.radio("Choose Input Type", ["File Upload", "Paste Content"], horizontal=True)
         
         raw_text = ""
         if input_mode == "File Upload":
             uploaded_file = st.file_uploader("Drop PDF or TXT here", type=["pdf", "txt"])
-            if st.button("📥 Process File"):
+            if st.button("📥 Process File", key="file_btn"):
                 if uploaded_file:
                     with st.spinner("Processing..."):
                         try:
@@ -101,7 +119,7 @@ def main():
                     st.warning("Please upload a file first.")
         else:
             pasted_text = st.text_area("Paste text content here", height=250)
-            if st.button("🚀 Analyze Paste"):
+            if st.button("🚀 Analyze Paste", key="paste_btn"):
                 if pasted_text.strip():
                     raw_text = pasted_text
                 else:
@@ -120,7 +138,7 @@ def main():
         if st.session_state.vector_store:
             st.info(f"Loaded: {len(st.session_state.text_chunks)} segments")
         
-        if st.button("🗑️ Reset Everything"):
+        if st.button("🗑️ Reset Everything", key="reset_btn"):
             st.session_state.text_chunks = None
             st.session_state.vector_store = None
             st.session_state.summary = ""
@@ -129,11 +147,11 @@ def main():
 
     # --- MIDDLE COLUMN: ASK A QUESTION ---
     with mid_col:
+        st.markdown('<h2 class="column-header">❓ Ask a Question</h2>', unsafe_allow_html=True)
         st.markdown('<div class="section-box">', unsafe_allow_html=True)
-        st.subheader("❓ Ask a Question")
-        question = st.text_input("What would you like to know?", placeholder="e.g. What is the main conclusion?")
+        question = st.text_input("What would you like to know?", placeholder="e.g. What is the main conclusion?", key="qa_input")
         
-        if st.button("🔍 Get Answer"):
+        if st.button("🔍 Get Answer", key="qa_btn"):
             if not st.session_state.vector_store:
                 st.warning("Please load a document first.")
             elif not question.strip():
@@ -150,10 +168,10 @@ def main():
 
     # --- RIGHT COLUMN: SUMMARIZE ---
     with right_col:
+        st.markdown('<h2 class="column-header">📝 Summarize</h2>', unsafe_allow_html=True)
         st.markdown('<div class="section-box">', unsafe_allow_html=True)
-        st.subheader("📝 Summarize")
         
-        if st.button("✨ Generate Summary"):
+        if st.button("✨ Generate Summary", key="sum_btn"):
             if not st.session_state.text_chunks:
                 st.warning("Please load a document first.")
             else:
