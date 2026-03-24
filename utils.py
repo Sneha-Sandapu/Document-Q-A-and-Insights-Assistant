@@ -1,5 +1,5 @@
 import PyPDF2
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 def extract_text_from_pdf(pdf_file):
     """Extract text from an uploaded PDF file."""

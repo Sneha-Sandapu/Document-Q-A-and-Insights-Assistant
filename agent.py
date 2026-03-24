@@ -1,12 +1,13 @@
 import os
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_community.vectorstores import FAISS
+from langchain.chat_models import ChatOpenAI
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.vectorstores import FAISS
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 from langchain.chains.summarize import load_summarize_chain
-from langchain_core.documents import Document
+from langchain.schema import Document
 from prompts import QA_PROMPT, ROUTING_PROMPT
-from langchain_core.prompts import PromptTemplate
+from langchain.prompts import PromptTemplate
 
 def get_vector_store(text_chunks):
     """Create and return a FAISS vector store from text chunks."""

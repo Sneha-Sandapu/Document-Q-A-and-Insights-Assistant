@@ -1,4 +1,4 @@
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain.prompts import ChatPromptTemplate, PromptTemplate
 
 qa_system_prompt = """You are an intelligent document assistant designed to extract information and provide insights based on the provided document context.
 Use the following pieces of retrieved context to answer the question.
