@@ -1,109 +1,95 @@
 import streamlit as st
-import certifi
 import os
+import certifi
 from dotenv import load_dotenv
 from utils import extract_text_from_pdf, extract_text_from_txt, get_text_chunks
-from agent import get_vector_store, process_user_input
+from agent import get_vector_store, process_user_input, get_summary, answer_query
 
-# Load environment variables
+# Load environment variables and SSL fix
 os.environ['SSL_CERT_FILE'] = certifi.where()
 load_dotenv()
 
-print("API KEY:", os.getenv("OPENAI_API_KEY"))
-
 # --- UI CONFIGURATION ---
 st.set_page_config(
-    page_title="Insight Assistant", 
+    page_title="Document QA & Insights", 
     page_icon="✨", 
     layout="wide",
-    initial_sidebar_state="expanded"
 )
 
-# Custom CSS for Premium Look
+# Custom CSS for Centered Title and 3-Column Premium Look
 st.markdown("""
     <style>
-    /* Main Background */
     .stApp {
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     }
-    
-    /* Sidebar Styling */
-    section[data-testid="stSidebar"] {
-        background-color: rgba(255, 255, 255, 0.8) !important;
-        backdrop-filter: blur(10px);
-        border-right: 1px solid rgba(255, 255, 255, 0.3);
-    }
-    
-    /* Header Styling */
-    .main-header {
+    .centered-title {
+        text-align: center;
         font-family: 'Inter', sans-serif;
         font-weight: 800;
         color: #1e3a8a;
-        font-size: 2.5rem;
-        margin-bottom: 0rem;
+        font-size: 2.8rem;
+        padding-top: 1rem;
+        padding-bottom: 2rem;
     }
-    
-    /* Card-like containers for messages */
-    .stChatMessage {
-        background-color: rgba(255, 255, 255, 0.6) !important;
-        border-radius: 15px !important;
-        padding: 10px !important;
-        margin-bottom: 10px !important;
-        border: 1px solid rgba(255, 255, 255, 0.4) !important;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05) !important;
+    .section-box {
+        background-color: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+        min-height: 600px;
     }
-    
-    /* Buttons */
+    .stHeader {
+        color: #1e40af;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
     .stButton>button {
         width: 100%;
-        border-radius: 10px;
-        background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+        border-radius: 8px;
+        background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
         color: white;
-        border: none;
-        padding: 0.5rem 1rem;
         font-weight: 600;
-        transition: transform 0.2s;
-    }
-    .stButton>button:hover {
-        transform: scale(1.02);
-        color: white;
-    }
-    
-    /* Status indicators */
-    .stAlert {
-        border-radius: 12px;
     }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
 """, unsafe_allow_html=True)
 
 def main():
-    # --- HEADER SECTION ---
-    col1, col2 = st.columns([0.8, 0.2])
-    with col1:
-        st.markdown('<h1 class="main-header">📄 Document Insights Assistant</h1>', unsafe_allow_html=True)
-        st.markdown("*Unlock knowledge from your documents with AI power.*")
-    
-    # Check for API key early
+    # --- CENTERED TITLE ---
+    st.markdown('<h1 class="centered-title">📄 Document Q&A and Insights Assistant</h1>', unsafe_allow_html=True)
+
+    # API Key Validation
     api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key or api_key == "your_openai_api_key_here":
-        st.warning("⚠️ **API Key Missing:** Please configure your `OPENAI_API_KEY` in the `.env` file to enable AI insights.")
+    if not api_key or "your_openai_api_key" in api_key:
+        st.error("🔑 **API Key Required:** Please add your `OPENAI_API_KEY` to the `.env` file.")
         st.stop()
+
+    # Initialize Session State
+    if "text_chunks" not in st.session_state:
+        st.session_state.text_chunks = None
+    if "vector_store" not in st.session_state:
+        st.session_state.vector_store = None
+    if "summary" not in st.session_state:
+        st.session_state.summary = ""
+
+    # --- 3-COLUMN LAYOUT ---
+    left_col, mid_col, right_col = st.columns([1, 1.2, 1], gap="large")
+
+    # --- LEFT COLUMN: UPLOAD & SETTINGS ---
+    with left_col:
+        st.markdown('<div class="section-box">', unsafe_allow_html=True)
+        st.subheader("⚙️ Upload & Settings")
         
-    # --- SIDEBAR: DOCUMENT MANAGEMENT ---
-    with st.sidebar:
-        st.image("https://cdn-icons-png.flaticon.com/512/4712/4712139.png", width=80)
-        st.header("Upload & Settings")
-        
-        input_method = st.radio("Input Method", ["File Upload", "Paste Text"], horizontal=True)
+        input_mode = st.radio("Choose Input Type", ["File Upload", "Paste Content"], horizontal=True)
         
         raw_text = ""
-        
-        if input_method == "File Upload":
-            uploaded_file = st.file_uploader("Upload PDF or TXT", type=["pdf", "txt"])
-            if st.button("✨ Process Document"):
+        if input_mode == "File Upload":
+            uploaded_file = st.file_uploader("Drop PDF or TXT here", type=["pdf", "txt"])
+            if st.button("📥 Process File"):
                 if uploaded_file:
-                    with st.spinner("Analyzing your document..."):
+                    with st.spinner("Processing..."):
                         try:
                             if uploaded_file.name.endswith('.pdf'):
                                 raw_text = extract_text_from_pdf(uploaded_file)
@@ -112,71 +98,79 @@ def main():
                         except Exception as e:
                             st.error(f"Error: {e}")
                 else:
-                    st.warning("Please select a file.")
+                    st.warning("Please upload a file first.")
         else:
-            pasted_text = st.text_area("Paste your content here", height=300, placeholder="Enter the text you want to analyze...")
+            pasted_text = st.text_area("Paste text content here", height=250)
             if st.button("🚀 Analyze Paste"):
                 if pasted_text.strip():
                     raw_text = pasted_text
                 else:
-                    st.warning("Please paste some text first.")
+                    st.warning("Please paste some text.")
 
-        # Shared processing logic
         if raw_text:
             try:
-                if not raw_text.strip():
-                    st.error("No extractable content found.")
-                else:
-                    # Chunk and store in session state
-                    text_chunks = get_text_chunks(raw_text)
-                    st.session_state.text_chunks = text_chunks
-                    st.session_state.vector_store = get_vector_store(text_chunks)
-                    st.success("Successfully processed! Ask anything below.")
+                chunks = get_text_chunks(raw_text)
+                st.session_state.text_chunks = chunks
+                st.session_state.vector_store = get_vector_store(chunks)
+                st.session_state.summary = "" # Clear old summary
+                st.success("✅ Content Loaded!")
             except Exception as e:
-                st.error(f"Processing error: {e}")
-
-        st.divider()
-        if st.session_state.get('vector_store'):
-            st.info(f"✅ Active Context: **{len(st.session_state.text_chunks)}** segments loaded.")
+                st.error(f"Processing Error: {e}")
         
-        if st.button("🗑️ Clear History"):
-            st.session_state.messages = []
+        if st.session_state.vector_store:
+            st.info(f"Loaded: {len(st.session_state.text_chunks)} segments")
+        
+        if st.button("🗑️ Reset Everything"):
+            st.session_state.text_chunks = None
+            st.session_state.vector_store = None
+            st.session_state.summary = ""
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- MAIN CHAT INTERFACE ---
-    # Initialize chat history
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    # --- MIDDLE COLUMN: ASK A QUESTION ---
+    with mid_col:
+        st.markdown('<div class="section-box">', unsafe_allow_html=True)
+        st.subheader("❓ Ask a Question")
+        question = st.text_input("What would you like to know?", placeholder="e.g. What is the main conclusion?")
+        
+        if st.button("🔍 Get Answer"):
+            if not st.session_state.vector_store:
+                st.warning("Please load a document first.")
+            elif not question.strip():
+                st.warning("Please enter a question.")
+            else:
+                with st.spinner("Thinking..."):
+                    try:
+                        answer = answer_query(question, st.session_state.vector_store)
+                        st.markdown("**Assistant's Response:**")
+                        st.write(answer)
+                    except Exception as e:
+                        st.error(f"QA Error: {e}")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # Display chat messages
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Chat Input
-    if prompt := st.chat_input("Ask a question or type 'summarize'..."):
-        if "vector_store" not in st.session_state:
-            st.chat_message("assistant").error("Please process a document or paste text in the sidebar first!")
-            return
-
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            with st.spinner("Deep thinking..."):
-                try:
-                    response, route_type = process_user_input(
-                        prompt, 
-                        st.session_state.vector_store,
-                        st.session_state.text_chunks
-                    )
-                    
-                    full_response = f"**{route_type} Mode Activated:**\n\n{response}"
-                    st.markdown(full_response)
-                    st.session_state.messages.append({"role": "assistant", "content": full_response})
-                except Exception as e:
-                    st.error(f"AI Error: {e}")
+    # --- RIGHT COLUMN: SUMMARIZE ---
+    with right_col:
+        st.markdown('<div class="section-box">', unsafe_allow_html=True)
+        st.subheader("📝 Summarize")
+        
+        if st.button("✨ Generate Summary"):
+            if not st.session_state.text_chunks:
+                st.warning("Please load a document first.")
+            else:
+                with st.spinner("Extracting insights..."):
+                    try:
+                        summary = get_summary(st.session_state.text_chunks)
+                        st.session_state.summary = summary
+                    except Exception as e:
+                        st.error(f"Summary Error: {e}")
+        
+        if st.session_state.summary:
+            st.markdown("**Document Insights:**")
+            st.write(st.session_state.summary)
+        elif st.session_state.text_chunks:
+            st.info("Click the button above to generate a full document summary.")
+            
+        st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
